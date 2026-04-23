@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GaleraList Premium</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
+    <style>
+        :root {
+            --primary: #00f3ff;
+            --accent: #bc13fe;
+            --bg: #050505;
+            --card: #121212;
+            --text: #ffffff;
+            --danger: #ff4444;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            transition: 0.3s;
+        }
+
+        /* --- SLIDER DE ANÚNCIOS PROFISSIONAL --- */
+        #ads-container {
+            background: rgba(20, 20, 20, 0.8);
+            border-bottom: 2px solid var(--primary);
+            height: 60px;
+            overflow: hidden;
+            position: relative;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+        }
+        .ads-wrapper { display: flex; width: 400%; height: 100%; transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1); }
+        .ad-slide { 
+            width: 100vw; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            text-decoration: none;
+            color: inherit;
+            font-size: 13px; 
+            font-weight: bold;
+            text-shadow: 0 0 10px var(--primary);
+        }
+
+        /* --- NOTIFICAÇÃO --- */
+        #notif-bar {
+            position: fixed;
+            top: -70px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 85%;
+            background: var(--primary);
+            color: #000;
+            padding: 15px;
+            border-radius: 0 0 20px 20px;
+            text-align: center;
+            font-weight: bold;
+            z-index: 9999;
+            transition: 0.4s;
+        }
+
+        .main-menu {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex-grow: 1;
+            gap: 15px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .btn-main {
+            width: 100%;
+            max-width: 320px;
+            padding: 18px;
+            background: var(--card);
+            border: 1px solid var(--primary);
+            color: var(--primary);
+            border-radius: 15px;
+            font-weight: bold;
+            text-transform: uppercase;
+            box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.1);
+        }
+
+        /* --- TELA DA LISTA --- */
+        #list-screen { display: none; flex-direction: column; height: 100%; padding: 20px; box-sizing: border-box; }
+        .list-info-bar {
+            display: flex;
+            justify-content: space-between;
+            background: #1a1a1a;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-size: 12px;
+            border: 1px solid #333;
+        }
+        .items-area { flex-grow: 1; overflow-y: auto; background: var(--card); border-radius: 20px; padding: 5px; border: 1px solid #222; }
+        
+        .item-row { 
+            display: flex; 
+            justify-content: space-between; 
+            padding: 15px; 
+            border-bottom: 1px solid #1a1a1a; 
+            align-items: center;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .item-text-group { flex-grow: 1; display: flex; flex-direction: column; }
+        .item-actions { display: flex; gap: 15px; align-items: center; }
+
+        .btn-item-del { background: none; border: none; color: var(--danger); font-size: 18px; padding: 5px; opacity: 0.6; }
+
+        /* --- HISTÓRICO PREMIUM --- */
+        #history-list { width: 100%; max-width: 320px; margin-top: 25px; border-top: 1px solid #222; padding-top: 20px; }
+        .history-title { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 2px; text-align: center; margin-bottom: 15px; }
+        
+        .history-item { 
+            background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
+            padding: 12px; border-radius: 12px; margin-bottom: 10px;
+            display: flex; align-items: center; gap: 12px;
+            border: 1px solid #222; cursor: pointer;
+            transition: 0.2s;
+        }
+        .history-item:active { transform: scale(0.96); border-color: var(--primary); }
+        .hist-icon { font-size: 20px; background: #222; padding: 8px; border-radius: 10px; border: 1px solid #333; }
+        .hist-info { display: flex; flex-direction: column; flex-grow: 1; }
+        .hist-name { font-weight: bold; color: #fff; font-size: 14px; }
+        .hist-type { font-size: 10px; color: var(--primary); text-transform: uppercase; }
+
+        .cat-bar { display: flex; gap: 10px; margin-bottom: 10px; overflow-x: auto; padding-bottom: 5px; }
+        .cat-btn { background: #1a1a1a; border: 1px solid #333; padding: 8px 12px; border-radius: 10px; color: white; white-space: nowrap; font-size: 12px; }
+
+        /* --- CONFIGURAÇÕES MODAL --- */
+        #config-menu { 
+            display: none; 
+            position: fixed; 
+            top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0, 0, 0, 0.9); 
+            z-index: 10000; 
+            backdrop-filter: blur(5px);
+        }
+        .config-content {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85%; max-width: 350px;
+            background: #0a0a0a;
+            padding: 25px;
+            border-radius: 20px;
+            /* AQUI ESTAVA O ERRO: Mudei para var(--primary) para a ledzinha brilhar na cor certa */
+            border: 2px solid var(--primary);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+            transition: 0.3s ease;
+        }
+        
+        .theme-btn { 
+            height: 45px; 
+            border-radius: 8px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            font-size: 11px; 
+            font-weight: bold; 
+            color: #000;
+            text-transform: uppercase;
+            transition: 0.2s;
+        }
+
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #1a1a1a; border: 1px solid #333; color: white; border-radius: 8px; box-sizing: border-box; }
+    </style>
+</head>
+<body onclick="setupAudio()">
+
+    <div id="notif-bar">Aviso</div>
+
+    <div id="ads-container">
+        <div class="ads-wrapper" id="ads-slider">
+            <a href="#" target="_blank" class="ad-slide">💎 PLANO COMUM: R$4,99 [CLIQUE AQUI]</a>
+            <a href="#" target="_blank" class="ad-slide" style="color:var(--accent)">💜 PROMO PLUS: R$12,99 [CLIQUE AQUI]</a>
+            <a href="#" target="_blank" class="ad-slide" style="color:#39ff14">🔋 MEGA MAX: R$29,99 [CLIQUE AQUI]</a>
+            <a href="#" target="_blank" class="ad-slide" style="color:#ffcc00">👑 VIP MEGA: R$99,99 [CLIQUE AQUI]</a>
+        </div>
+    </div>
+
+    <button id="btn-config-main" onclick="playSfx('tap'); toggleConfig(true)" style="position: absolute; top: 75px; right: 20px; background: none; border: none; font-size: 24px; color: white; z-index: 20;">⚙️</button>
+
+    <div class="main-menu" id="home-screen">
+        <h1 id="main-title" style="color: var(--primary); letter-spacing: 2px; margin: 0;">GALERA LIST</h1>
+        <p style="font-size: 10px; color: #555; margin-bottom: 20px; font-weight: bold;">PREMIUM v2.7</p>
+        
+        <button class="btn-main" onclick="playSfx('tap'); openLivre()">Lista Livre</button>
+        <button class="btn-main" onclick="playSfx('tap'); openPrivada()">Criar Privada</button>
+        <button class="btn-main" onclick="playSfx('tap'); acessarPrivada()">Acessar Privada</button>
+        
+        <div id="history-list">
+            <div class="history-title">Listas Recentes</div>
+            <div id="history-content"></div>
+        </div>
+    </div>
+
+    <div id="list-screen">
+        <div class="list-info-bar">
+            <span id="display-senha" style="color: var(--primary);">---</span>
+            <span id="display-contador" style="color: var(--accent);">Pessoas: 1/5</span>
+        </div>
+        
+        <div class="cat-bar">
+            <div class="cat-btn" onclick="setCat('🍎')">🍎 Hortifruti</div>
+            <div class="cat-btn" onclick="setCat('🥩')">🥩 Açougue</div>
+            <div class="cat-btn" onclick="setCat('🧃')">🧃 Bebidas</div>
+            <div class="cat-btn" onclick="setCat('🧼')">🧼 Limpeza</div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h2 id="list-name-display" style="color: #fff; margin: 0; font-size: 18px;">Lista</h2>
+            <button onclick="playSfx('del'); exitList()" style="background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 8px; font-weight: bold;">SAIR</button>
+        </div>
+        
+        <div style="display: flex; gap: 8px; margin-bottom: 15px;">
+            <input type="text" id="new-item-input" placeholder="O que deseja adicionar?">
+            <input type="number" id="new-item-qty" value="1" style="width: 45px; text-align: center; background: #111; border: 1px solid #333; color: var(--primary); border-radius: 8px; font-weight: bold;">
+            <button onclick="addItem()" style="background: var(--primary); border: none; width: 45px; border-radius: 8px; font-weight: bold; font-size: 20px;">+</button>
+        </div>
+        
+        <div class="items-area" id="items-list"></div>
+    </div>
+
+    <div id="config-menu">
+        <div class="config-content" id="config-box">
+            <button onclick="toggleConfig(false)" style="color: white; background: none; float: right; border: none; font-size: 24px;">×</button>
+            <h3 style="color: var(--primary); margin: 0;">Configurações</h3>
+            
+            <label style="font-size: 12px; display: block; margin-top: 15px;">Seu Apelido:</label>
+            <input type="text" id="cfg-user-name">
+            
+            <h3 style="color: var(--primary); margin-top: 20px; font-size: 16px;">Temas Néon</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="theme-btn" style="background:#00f3ff;" onclick="applyTheme('blue')">Ciano</div>
+                <div class="theme-btn" style="background:#bc13fe;" onclick="applyTheme('pink')">Roxo</div>
+                <div class="theme-btn" style="background:#39ff14;" onclick="applyTheme('green')">Verde</div>
+                <div class="theme-btn" style="background:#ffcc00;" onclick="applyTheme('gold')">Ouro</div>
+            </div>
+            <button onclick="saveProfile()" style="width: 100%; padding: 15px; background: var(--primary); color: #000; border: none; border-radius: 10px; font-weight: bold; margin-top: 25px;">SALVAR ALTERAÇÕES</button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBjKMZAVsOqGSSzoeLDvL5c3...", 
+            databaseURL: "https://galeralist-4fc0b-default-rtdb.firebaseio.com",
+            projectId: "galeralist-4fc0b",
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let currentPath = "";
+        let myUser = localStorage.getItem('gl_user') || "Usuário";
+        let mySessionId = Math.random().toString(36).substring(7);
+        const emojis = ['🛒', '🍕', '🍻', '🛍️', '🔥', '💎', '📦', '🔋'];
+
+        function applyTheme(theme) {
+            const root = document.documentElement;
+            const configBox = document.getElementById('config-box');
+            localStorage.setItem('gl_theme', theme);
+            
+            if(theme === 'blue') { 
+                root.style.setProperty('--primary', '#00f3ff'); 
+                root.style.setProperty('--accent', '#bc13fe'); 
+                if(configBox) configBox.style.boxShadow = "0 0 30px rgba(0, 243, 255, 0.2)";
+            }
+            else if(theme === 'pink') { 
+                root.style.setProperty('--primary', '#bc13fe'); 
+                root.style.setProperty('--accent', '#00f3ff'); 
+                if(configBox) configBox.style.boxShadow = "0 0 30px rgba(188, 19, 254, 0.2)";
+            }
+            else if(theme === 'green') { 
+                root.style.setProperty('--primary', '#39ff14'); 
+                root.style.setProperty('--accent', '#bc13fe'); 
+                if(configBox) configBox.style.boxShadow = "0 0 30px rgba(57, 255, 20, 0.2)";
+            }
+            else if(theme === 'gold') { 
+                root.style.setProperty('--primary', '#ffcc00'); 
+                root.style.setProperty('--accent', '#ff9800'); 
+                if(configBox) configBox.style.boxShadow = "0 0 30px rgba(255, 204, 0, 0.2)";
+            }
+        }
+        applyTheme(localStorage.getItem('gl_theme') || 'blue');
+
+        const audioAssets = {
+            tap: 'https://cdn.pixabay.com/audio/2022/03/15/audio_7315cc3947.mp3',
+            add: 'https://cdn.pixabay.com/audio/2022/03/10/audio_c3527e58c0.mp3',
+            del: 'https://cdn.pixabay.com/audio/2022/03/10/audio_5fe6964094.mp3',
+            check: 'https://cdn.pixabay.com/audio/2021/08/04/audio_0625345d90.mp3'
+        };
+        const players = {};
+        let isAudioReady = false;
+        Object.keys(audioAssets).forEach(k => { players[k] = new Audio(audioAssets[k]); });
+        function setupAudio() { if(!isAudioReady){ Object.values(players).forEach(p => {p.play().then(()=>{p.pause();p.currentTime=0;})}); isAudioReady=true; } }
+        function playSfx(t) { if(isAudioReady && players[t]){ players[t].currentTime=0; players[t].play(); } }
+
+        function setCat(cat) { playSfx('tap'); document.getElementById('new-item-input').value = cat + " "; }
+
+        function startApp() {
+            document.getElementById('ads-container').style.display = 'none';
+            document.getElementById('home-screen').style.display = 'none';
+            document.getElementById('list-screen').style.display = 'flex';
+            document.getElementById('btn-config-main').style.display = 'none';
+            db.ref(currentPath + '/presenca/' + mySessionId).set({ nome: myUser });
+            db.ref(currentPath + '/presenca/' + mySessionId).onDisconnect().remove();
+            loadData();
+        }
+
+        function exitList() {
+            document.getElementById('ads-container').style.display = 'block';
+            document.getElementById('home-screen').style.display = 'flex';
+            document.getElementById('list-screen').style.display = 'none';
+            document.getElementById('btn-config-main').style.display = 'block';
+            db.ref(currentPath + '/itens').off();
+            currentPath = "";
+            renderHistory();
+        }
+
+        function loadData() {
+            db.ref(currentPath + '/itens').on('value', snap => {
+                const listDiv = document.getElementById('items-list');
+                listDiv.innerHTML = "";
+                snap.forEach(child => {
+                    const item = child.val();
+                    const itemId = child.key;
+                    let q = item.quantidade > 1 ? ` (${item.quantidade}x)` : "";
+                    let info = item.compradoPor ? `<small style="color:var(--primary); font-size:10px;">Por: ${item.compradoPor}</small>` : "";
+                    listDiv.innerHTML += `
+                        <div class="item-row">
+                            <div class="item-text-group" onclick="toggleItem('${itemId}',${item.feito})">
+                                <span style="${item.feito?'text-decoration:line-through;color:#444':''}">${item.nome}${q}</span>
+                                ${info}
+                            </div>
+                            <div class="item-actions">
+                                <span onclick="toggleItem('${itemId}',${item.feito})">${item.feito?'✅':'⬜'}</span>
+                                <button class="btn-item-del" onclick="deleteItem('${itemId}')">🗑️</button>
+                            </div>
+                        </div>`;
+                });
+            });
+        }
+
+        function reentrarLista(n, t, p) {
+            currentPath = t === 'livre' ? "listas/livre" : "listas/privadas/" + n;
+            document.getElementById('display-senha').innerText = "Senha: " + (p || "LIVRE");
+            document.getElementById('list-name-display').innerText = n;
+            startApp();
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('history-content');
+            let hist = JSON.parse(localStorage.getItem('gl_history') || '[]');
+            if(hist.length === 0) { container.innerHTML = "<p style='color:#333; text-align:center; font-size:10px;'>Vazio</p>"; return; }
+            container.innerHTML = hist.map((i, idx) => `
+                <div class="history-item" onclick="playSfx('tap'); reentrarLista('${i.name}','${i.type}','${i.pass}')">
+                    <div class="hist-icon">${emojis[idx % emojis.length]}</div>
+                    <div class="hist-info">
+                        <span class="hist-name">${i.name}</span>
+                        <span class="hist-type">${i.type === 'livre' ? '🌍 Pública' : '🔒 Privada'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addItem() {
+            let i = document.getElementById('new-item-input');
+            let q = document.getElementById('new-item-qty');
+            if(!i.value) return;
+            playSfx('add');
+            db.ref(currentPath + '/itens').push({ nome: i.value, quantidade: q.value, feito: false });
+            i.value = ""; q.value = "1";
+        }
+
+        function toggleItem(id, s) { playSfx('check'); db.ref(currentPath + '/itens/' + id).update({ feito: !s, compradoPor: !s ? myUser : null }); }
+        function deleteItem(id) { if(confirm("Deseja apagar este item?")) { playSfx('del'); db.ref(currentPath + '/itens/' + id).remove(); } }
+
+        function openLivre() { currentPath = "listas/livre"; saveToHistory("Lista Livre", "livre"); startApp(); }
+        function openPrivada() {
+            let n = prompt("Nome:"); let s = prompt("Senha:");
+            if(n && s) { currentPath = "listas/privadas/"+n; db.ref(currentPath+'/senha').set(s); saveToHistory(n,"privada",s); startApp(); }
+        }
+        function acessarPrivada() {
+            let n = prompt("Nome:"); let s = prompt("Senha:");
+            if(n && s){ db.ref("listas/privadas/"+n+"/senha").once('value').then(snap => {
+                if(snap.val()===s){ currentPath="listas/privadas/"+n; saveToHistory(n,"privada",s); startApp(); } else { alert("Erro"); }
+            }); }
+        }
+
+        function saveToHistory(n, t, p) {
+            let h = JSON.parse(localStorage.getItem('gl_history') || '[]');
+            h = h.filter(x => x.name !== n);
+            h.unshift({name:n, type:t, pass:p});
+            if(h.length>5)h.pop();
+            localStorage.setItem('gl_history', JSON.stringify(h));
+            renderHistory();
+        }
+
+        function toggleConfig(s) { document.getElementById('config-menu').style.display = s?'block':'none'; }
+        function saveProfile() { myUser = document.getElementById('cfg-user-name').value || "Usuário"; localStorage.setItem('gl_user', myUser); toggleConfig(false); }
+
+        let curAd = 0;
+        setInterval(() => { 
+            curAd = (curAd + 1) % 4; 
+            const s = document.getElementById('ads-slider');
+            if(s) s.style.transform = `translateX(-${curAd * 100}vw)`; 
+        }, 4000);
+
+        renderHistory();
+        document.getElementById('cfg-user-name').value = myUser;
+    </script>
+</body>
+</html>
